@@ -15,6 +15,7 @@ import os
 import time
 
 from app.core.redis_client import redis_client
+from .config import settings
 from .api.v1 import (
     users_lightning,
     cities,
@@ -94,8 +95,11 @@ async def lifespan(app: FastAPI):
     try:
         from .core.supabase_connection_pool import supabase_pool
 
-        await supabase_pool.initialize()
-        logger.info("✅ Supabase connection pool initialized")
+        if settings.supabase_url and settings.supabase_service_role_key:
+            await supabase_pool.initialize()
+            logger.info("✅ Supabase connection pool initialized")
+        else:
+            logger.info("Supabase credentials not configured; using challenge mode")
     except Exception as e:
         logger.error(f"❌ Supabase connection pool initialization failed: {e}")
         # Continue startup - fallback to direct connections
