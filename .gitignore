@@ -1,0 +1,9 @@
+# Python generated files
+*.pyc
+__pycache__/
+
+# Environment files
+.env
+
+# Local dependencies
+node_modules/

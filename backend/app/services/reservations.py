@@ -49,13 +49,13 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
                 from sqlalchemy import text
                 
                 query = text("""
-                    SELECT 
-                        property_id,
-                        SUM(total_amount) as total_revenue,
+                    SELECT
+                        r.property_id,
+                        SUM(r.total_amount) as total_revenue,
                         COUNT(*) as reservation_count
-                    FROM reservations 
-                    WHERE property_id = :property_id AND tenant_id = :tenant_id
-                    GROUP BY property_id
+                    FROM reservations r
+                    WHERE r.property_id = :property_id AND r.tenant_id = :tenant_id
+                    GROUP BY r.property_id
                 """)
                 
                 result = await session.execute(query, {
@@ -64,6 +64,38 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
                 })
                 row = result.fetchone()
                 
+                monthly_query = text("""
+                    SELECT
+                        TO_CHAR(
+                            DATE_TRUNC(
+                                'month',
+                                r.check_in_date AT TIME ZONE COALESCE(p.timezone, 'UTC')
+                            ),
+                            'YYYY-MM'
+                        ) AS month,
+                        SUM(r.total_amount) AS total_revenue,
+                        COUNT(*) AS reservation_count
+                    FROM reservations r
+                    LEFT JOIN properties p
+                        ON p.id = r.property_id AND p.tenant_id = r.tenant_id
+                    WHERE r.property_id = :property_id AND r.tenant_id = :tenant_id
+                    GROUP BY 1
+                    ORDER BY 1
+                """)
+
+                monthly_result = await session.execute(monthly_query, {
+                    "property_id": property_id,
+                    "tenant_id": tenant_id,
+                })
+                monthly_breakdown = [
+                    {
+                        "month": monthly_row[0],
+                        "total_revenue": str(Decimal(str(monthly_row[1]))),
+                        "reservations_count": monthly_row[2],
+                    }
+                    for monthly_row in monthly_result.fetchall()
+                ]
+
                 if row:
                     total_revenue = Decimal(str(row.total_revenue))
                     return {
@@ -71,7 +103,8 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
                         "tenant_id": tenant_id,
                         "total": str(total_revenue),
                         "currency": "USD", 
-                        "count": row.reservation_count
+                        "count": row.reservation_count,
+                        "monthly_breakdown": monthly_breakdown,
                     }
                 else:
                     # No reservations found for this property
@@ -80,7 +113,8 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
                         "tenant_id": tenant_id,
                         "total": "0.00",
                         "currency": "USD",
-                        "count": 0
+                        "count": 0,
+                        "monthly_breakdown": [],
                     }
         else:
             raise Exception("Database pool not available")
@@ -89,7 +123,7 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
         print(f"Database error for {property_id} (tenant: {tenant_id}): {e}")
         
         mock_data = {
-            ('tenant-a', 'prop-001'): {'total': '2250.00', 'count': 4},
+            ('tenant-a', 'prop-001'): {'total': '8000.00', 'count': 4},
             ('tenant-b', 'prop-001'): {'total': '0.00', 'count': 0},
             ('tenant-a', 'prop-002'): {'total': '4975.50', 'count': 4},
             ('tenant-a', 'prop-003'): {'total': '6100.50', 'count': 2},
@@ -104,5 +138,6 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
             "tenant_id": tenant_id, 
             "total": mock_property_data['total'],
             "currency": "USD",
-            "count": mock_property_data['count']
+            "count": mock_property_data['count'],
+            "monthly_breakdown": []
         }

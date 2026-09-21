@@ -6,6 +6,13 @@ interface RevenueData {
     total_revenue: number;
     currency: string;
     reservations_count: number;
+    monthly_breakdown: MonthlyRevenue[];
+}
+
+interface MonthlyRevenue {
+    month: string;
+    total_revenue: string;
+    reservations_count: number;
 }
 
 interface RevenueSummaryProps {
@@ -62,6 +69,7 @@ export const RevenueSummary: React.FC<RevenueSummaryProps> = ({ propertyId = 'pr
     if (!data) return null;
 
     const displayTotal = Math.round(data.total_revenue * 100) / 100;
+    const monthlyBreakdown = data.monthly_breakdown ?? [];
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
@@ -80,13 +88,6 @@ export const RevenueSummary: React.FC<RevenueSummaryProps> = ({ propertyId = 'pr
                             <span className="text-3xl font-bold text-gray-900 tracking-tight">
                                 {data.currency} {displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            {/* Fake trend indicator for premium feel */}
-                            <span className="inline-flex items-baseline px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 md:mt-2 lg:mt-0">
-                                <svg className="-ml-1 mr-0.5 h-3 w-3 flex-shrink-0 self-center text-green-500" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                </svg>
-                                12%
-                            </span>
                         </div>
                     </div>
                 </div>
@@ -100,6 +101,44 @@ export const RevenueSummary: React.FC<RevenueSummaryProps> = ({ propertyId = 'pr
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Reservations</p>
                         <p className="text-sm font-semibold text-gray-700 mt-1">{data.reservations_count} <span className="font-normal text-gray-400">bookings</span></p>
                     </div>
+                </div>
+
+                <div className="mt-6 border-t border-gray-100 pt-4">
+                    <h3 className="text-xs font-medium uppercase tracking-wider text-gray-500">Monthly Breakdown</h3>
+                    {monthlyBreakdown.length > 0 ? (
+                        <div className="mt-3 overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="text-xs uppercase tracking-wider text-gray-400">
+                                    <tr>
+                                        <th className="pb-2 font-medium">Month</th>
+                                        <th className="pb-2 text-right font-medium">Revenue</th>
+                                        <th className="pb-2 text-right font-medium">Bookings</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {monthlyBreakdown.map((monthlyRevenue) => (
+                                        <tr key={monthlyRevenue.month}>
+                                            <td className="py-2 font-medium text-gray-700">
+                                                {new Date(`${monthlyRevenue.month}-01T00:00:00`).toLocaleDateString(undefined, {
+                                                    month: 'long',
+                                                    year: 'numeric',
+                                                })}
+                                            </td>
+                                            <td className="py-2 text-right text-gray-700">
+                                                {data.currency} {Number(monthlyRevenue.total_revenue).toLocaleString(undefined, {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </td>
+                                            <td className="py-2 text-right text-gray-500">{monthlyRevenue.reservations_count}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="mt-2 text-sm text-gray-500">No monthly revenue available.</p>
+                    )}
                 </div>
 
                 {/* Precision Warning Area */}
